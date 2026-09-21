@@ -347,6 +347,12 @@ namespace Comet.Network.Sockets
         /// <param name="actor">Actor being disconnected</param>
         private void Disconnecting(TActor actor)
         {
+            if (actor == null || !actor.TryBeginDisconnect())
+                return;
+
+            // A cancelled receive does not close the underlying socket by itself.
+            actor.Disconnect();
+
             // Reclaim resources and release back to server pools
             actor.Buffer.Span.Clear();
             this.BufferPool.Push(actor.Buffer);

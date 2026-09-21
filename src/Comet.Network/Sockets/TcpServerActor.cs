@@ -4,6 +4,7 @@ namespace Comet.Network.Sockets
     using System.Net;
     using System.Net.Sockets;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
     using Comet.Network.Packets;
     using Comet.Network.Security;
@@ -23,6 +24,7 @@ namespace Comet.Network.Sockets
         public readonly byte[] PacketFooter;
         public readonly uint Partition;
         private readonly object SendLock;
+        private int DisconnectStarted;
 
         /// <summary>
         /// Instantiates a new instance of <see cref="TcpServerActor"/> using an accepted
@@ -48,6 +50,10 @@ namespace Comet.Network.Sockets
             this.Partition = partition;
             this.SendLock = new object();
         }
+
+        /// <summary>Returns true only for the first disconnect attempt.</summary>
+        public bool TryBeginDisconnect() =>
+            Interlocked.Exchange(ref this.DisconnectStarted, 1) == 0;
 
         /// <summary>
         /// Sends a packet to the game client after encrypting bytes. This may be called

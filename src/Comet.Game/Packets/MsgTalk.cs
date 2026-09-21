@@ -181,6 +181,7 @@ namespace Comet.Game.Packets
                     var recipient = Kernel.Clients.Values
                         .FirstOrDefault(x =>
                             x.Character != null &&
+                            x.Socket.Connected &&
                             string.Equals(x.Character.Name, this.RecipientName));
 
                     await client.SendAsync(this);
