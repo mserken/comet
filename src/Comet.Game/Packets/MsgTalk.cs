@@ -5,6 +5,8 @@ namespace Comet.Game.Packets
     using System.Drawing;
     using Comet.Game.States;
     using Comet.Network.Packets;
+    using System.Linq;
+    using System.Threading.Tasks;
 
     /// <remarks>Packet Type 1004</remarks>
     /// <summary>
@@ -26,6 +28,14 @@ namespace Comet.Game.Packets
         public string SenderName { get; set; }
         public string Suffix { get; set; }
         public string Message { get; set; }
+
+        /// <summary>
+        /// Instantiates a new instance of <see cref="MsgTalk"/> with an empty buffer.
+        /// </summary>
+        public MsgTalk()
+        {
+            Type = PacketType.MsgTalk;
+        }
 
         /// <summary>
         /// Instantiates a new instance of <see cref="MsgTalk"/> using the recipient's 
@@ -147,6 +157,48 @@ namespace Comet.Game.Packets
                 this.Message
             });
             return writer.ToArray();
+        }
+
+        public override async Task ProcessAsync(Client client)
+        {
+            Character sender = client.Character;
+
+            switch (this.Channel)
+            {
+                case TalkChannel.Talk:
+                    var recipients = Kernel.Clients.Values
+                        .Where(x => x != client && x.Character != null && x.Socket.Connected)
+                        .ToArray();
+
+                    Console.WriteLine($"Sending message to {recipients.Length} recipients.");
+                    Console.WriteLine($"Recipient list: {string.Join(", ", recipients.Select(x => x.Character.Name))}");
+                    Console.WriteLine($"[{this.Channel}] {this.SenderName} speaks to {this.RecipientName}: {this.Message}");
+
+                    await Task.WhenAll(recipients.Select(x => x.SendAsync(this)));
+                    break;
+
+                case TalkChannel.Whisper:
+                    var recipient = Kernel.Clients.Values
+                        .FirstOrDefault(x =>
+                            x.Character != null &&
+                            string.Equals(x.Character.Name, this.RecipientName));
+
+                    await client.SendAsync(this);
+                    Console.WriteLine($"[{this.Channel}] {this.SenderName} speaks to {this.RecipientName}: {this.Message}");
+                    
+                    if (recipient == null)
+                    {
+                        var systemMessage = new MsgTalk(client.ID, TalkChannel.System, Color.White,
+                            this.SenderName, MsgTalk.SYSTEM, $"Recipient '{this.RecipientName}' is not online.");
+                        await client.SendAsync(systemMessage);
+                        Console.WriteLine($"[{systemMessage.Channel}] {systemMessage.SenderName} to {systemMessage.RecipientName}: {systemMessage.Message}");
+                        return;
+                    }
+
+                    if (recipient.Socket.Connected)
+                        await recipient.SendAsync(this);
+                    break;
+            }
         }
 
         // Static messages

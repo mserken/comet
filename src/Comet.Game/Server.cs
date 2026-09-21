@@ -134,6 +134,7 @@ namespace Comet.Game
                     case PacketType.MsgItem:     msg = new MsgItem(); break;
                     case PacketType.MsgAction:   msg = new MsgAction(); break;
                     case PacketType.MsgConnect:  msg = new MsgConnect(); break;
+                    case PacketType.MsgTalk:     msg = new MsgTalk(); break;
 
                     default:
                         Console.WriteLine(
