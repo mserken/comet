@@ -199,6 +199,11 @@ namespace Comet.Game.Packets
                         await recipient.SendAsync(this);
                     break;
             }
+            if (this.Message.Equals("/dc", StringComparison.OrdinalIgnoreCase))
+            {
+                client.Socket.Disconnect(false);
+                Console.WriteLine($"Player {client.Character.Name} has /dc'd.");
+            }
         }
 
         // Static messages
