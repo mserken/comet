@@ -200,6 +200,10 @@ namespace Comet.Game.Packets
             {
                 client.Socket.Disconnect(false);
                 Console.WriteLine($"Player {client.Character.Name} has /dc'd.");
+            } else if (this.Message.Equals("/spawn", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"[MsgPlayer] Manual spawn replay requested by {client.ID} ({client.Character.Name}).");
+                await MsgPlayer.BroadcastAsync(client);
             } else if (this.Message.StartsWith("/tp", StringComparison.OrdinalIgnoreCase))
             {
                 await ProcessTeleportAsync(client);

@@ -97,6 +97,7 @@ namespace Comet.Game.Packets
                     this.X = client.Character.X;
                     this.Y = client.Character.Y;
                     await client.SendAsync(this);
+                    await MsgPlayer.BroadcastAsync(client);
                     break;
 
                 case ActionType.LoginComplete:
