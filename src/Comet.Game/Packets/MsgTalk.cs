@@ -261,6 +261,42 @@ namespace Comet.Game.Packets
                     return;
             }
 
+            var previousMapId = client.Character.MapID;
+            var previousMapPlayers = Kernel.Clients.Values
+                .Where(x => x != client && x.Character != null && x.Socket.Connected &&
+                    x.Character.MapID == previousMapId)
+                .ToArray();
+
+            if (previousMapId != mapId)
+            {
+                var removeEntity = new MsgAction
+                {
+                    CharacterID = client.ID,
+                    Action = MsgAction.ActionType.MapRemoveSpawn
+                };
+
+                Console.WriteLine(
+                    "[MsgAction] Removing identity={0} from map={1}, recipients={2}",
+                    client.ID, previousMapId, previousMapPlayers.Length);
+
+                await Task.WhenAll(previousMapPlayers.Select(async player =>
+                {
+                    try
+                    {
+                        await player.SendAsync(removeEntity);
+                        Console.WriteLine(
+                            "[MsgAction] Sent MapRemoveSpawn identity={0} to recipient={1}",
+                            client.ID, player.ID);
+                    }
+                    catch (Exception exception)
+                    {
+                        Console.WriteLine(
+                            "[MsgAction] MapRemoveSpawn failed identity={0} to recipient={1}: {2}",
+                            client.ID, player.ID, exception);
+                    }
+                }));
+            }
+
             client.Character.MapID = mapId;
             client.Character.X = x;
             client.Character.Y = y;
@@ -273,6 +309,7 @@ namespace Comet.Game.Packets
                 X = x,
                 Y = y
             });
+            await MsgPlayer.BroadcastAsync(client);
             await SendSystemMessageAsync(client,
                 $"You have teleported to map {mapId} at ({x}, {y}).");
             Console.WriteLine($"Player {client.Character.Name} has /tp'd to map {mapId} at ({x}, {y}).");
