@@ -68,6 +68,7 @@ namespace Comet.Game.States
                 this.LastSaveTimestamp = now;
                 await CharactersRepository.SaveAsync(this);
             }
+            Console.WriteLine("Character {0} saved to database.", this.Name);
         }
     }
 
