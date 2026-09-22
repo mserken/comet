@@ -161,8 +161,6 @@ namespace Comet.Game.Packets
 
         public override async Task ProcessAsync(Client client)
         {
-            Character sender = client.Character;
-
             switch (this.Channel)
             {
                 case TalkChannel.Talk:
@@ -189,10 +187,8 @@ namespace Comet.Game.Packets
                     
                     if (recipient == null)
                     {
-                        var systemMessage = new MsgTalk(client.ID, TalkChannel.System, Color.White,
-                            this.SenderName, MsgTalk.SYSTEM, $"Recipient '{this.RecipientName}' is not online.");
-                        await client.SendAsync(systemMessage);
-                        Console.WriteLine($"[{systemMessage.Channel}] {systemMessage.SenderName} to {systemMessage.RecipientName}: {systemMessage.Message}");
+                        await SendSystemMessageAsync(client,
+                            $"Recipient '{this.RecipientName}' is not online.");
                         return;
                     }
 
@@ -204,7 +200,86 @@ namespace Comet.Game.Packets
             {
                 client.Socket.Disconnect(false);
                 Console.WriteLine($"Player {client.Character.Name} has /dc'd.");
+            } else if (this.Message.StartsWith("/tp", StringComparison.OrdinalIgnoreCase))
+            {
+                await ProcessTeleportAsync(client);
             }
+        }
+
+        private async Task ProcessTeleportAsync(Client client)
+        {
+            const string usage = "Usage: /tp <mapId|alias> [x y] or /tp <x> <y>";
+            var arguments = this.Message.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            uint mapId = client.Character.MapID;
+            ushort x;
+            ushort y;
+            switch (arguments.Length)
+            {
+                case 3:
+                    if (!ushort.TryParse(arguments[1], out x) ||
+                        !ushort.TryParse(arguments[2], out y))
+                    {
+                        await SendSystemMessageAsync(client, usage);
+                        return;
+                    }
+                    break;
+
+                case 2:
+                    if (!MapLocations.TryGetMapID(arguments[1], out mapId))
+                    {
+                        await SendSystemMessageAsync(client, usage);
+                        return;
+                    }
+
+                    if (!MapLocations.TryGetDefault(mapId, out MapLocation location))
+                    {
+                        await SendSystemMessageAsync(client,
+                            $"No default coordinates are defined for map {mapId}.");
+                        return;
+                    }
+
+                    x = location.X;
+                    y = location.Y;
+                    break;
+
+                case 4:
+                    if (!MapLocations.TryGetMapID(arguments[1], out mapId) ||
+                        !ushort.TryParse(arguments[2], out x) ||
+                        !ushort.TryParse(arguments[3], out y))
+                    {
+                        await SendSystemMessageAsync(client, usage);
+                        return;
+                    }
+                    break;
+
+                default:
+                    await SendSystemMessageAsync(client, usage);
+                    return;
+            }
+
+            client.Character.MapID = mapId;
+            client.Character.X = x;
+            client.Character.Y = y;
+            await client.SendAsync(new MsgAction
+            {
+                CharacterID = client.ID,
+                Action = MsgAction.ActionType.MapTeleport,
+                Command = mapId,
+                Map = mapId,
+                X = x,
+                Y = y
+            });
+            await SendSystemMessageAsync(client,
+                $"You have teleported to map {mapId} at ({x}, {y}).");
+            Console.WriteLine($"Player {client.Character.Name} has /tp'd to map {mapId} at ({x}, {y}).");
+        }
+
+        private async Task SendSystemMessageAsync(Client client, string message)
+        {
+            var systemMessage = new MsgTalk(client.ID, TalkChannel.System, Color.White,
+            client.Character.Name, MsgTalk.SYSTEM, message);
+            await client.SendAsync(systemMessage);
+            Console.WriteLine($"[{systemMessage.Channel}] {systemMessage.SenderName} to {systemMessage.RecipientName}: {systemMessage.Message}");
         }
 
         // Static messages

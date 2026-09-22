@@ -25,6 +25,12 @@ namespace Comet.Game.Packets
         public uint Map { get; set; }
         public uint Color { get; set; }
 
+        public MsgAction()
+        {
+            Type = PacketType.MsgAction;
+            Arguments = new ushort[2];
+        }
+
         /// <summary>
         /// Decodes a byte packet into the packet structure defined by this message class. 
         /// Should be invoked to structure data from the client for processing. Decoding
@@ -96,7 +102,7 @@ namespace Comet.Game.Packets
                 case ActionType.LoginComplete:
                     await client.SendAsync(this);
                     break;
-
+                
                 default:
                     await client.SendAsync(this);
                     await client.SendAsync(new MsgTalk(client.ID, MsgTalk.TalkChannel.Service,
