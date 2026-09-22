@@ -1,7 +1,8 @@
-﻿namespace Comet.Game
+namespace Comet.Game
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
     using Comet.Game.Database;
@@ -67,6 +68,29 @@
             Console.WriteLine("Listening for new connections");
             Console.WriteLine();
             
+            // Register graceful shutdown handlers to save all connected characters
+            // before the process exits (SIGTERM, Ctrl+C, Docker stop, etc.)
+            static void SaveAllCharacters()
+            {
+                Console.WriteLine("Saving all connected characters before shutdown...");
+                var saves = Kernel.Clients.Values
+                    .Where(c => c.Character != null)
+                    .Select(c => c.Character.SaveAsync(true));
+                Task.WhenAll(saves).GetAwaiter().GetResult();
+                Console.WriteLine("All characters saved.");
+            }
+
+            Console.CancelKeyPress += (_, e) =>
+            {
+                e.Cancel = true;
+                SaveAllCharacters();
+            };
+
+            AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            {
+                SaveAllCharacters();
+            };
+
             await rpcServerTask;
             await serverTask;
         }
