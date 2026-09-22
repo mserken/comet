@@ -1,6 +1,7 @@
 namespace Comet.Game.Packets
 {
     using System;
+    using System.Linq;
     using System.Threading.Tasks;
     using Comet.Game.States;
     using Comet.Network.Packets;
@@ -102,6 +103,31 @@ namespace Comet.Game.Packets
 
                 case ActionType.LoginComplete:
                     await client.SendAsync(this);
+                    break;
+
+                case ActionType.CharacterDirection:
+                case ActionType.CharacterEmote:
+                case ActionType.CharacterAway:
+                    if (client.Character == null)
+                        return;
+
+                    CharacterID = client.ID;
+                    var recipients = Kernel.Clients.Values
+                        .Where(x => x != client && x.Character != null && x.Socket.Connected &&
+                            x.Character.MapID == client.Character.MapID)
+                        .ToArray();
+
+                    Console.WriteLine(
+                        "[MsgAction] Broadcasting {0} identity={1}, direction={2}, map={3}, recipients={4}",
+                        Action, CharacterID, Direction, client.Character.MapID, recipients.Length);
+
+                    await Task.WhenAll(recipients.Select(async recipient =>
+                    {
+                        await recipient.SendAsync(this);
+                        Console.WriteLine(
+                            "[MsgAction] Sent {0} identity={1} to recipient={2}",
+                            Action, CharacterID, recipient.ID);
+                    }));
                     break;
                 
                 default:
