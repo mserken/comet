@@ -161,6 +161,13 @@ namespace Comet.Game.Packets
 
         public override async Task ProcessAsync(Client client)
         {
+            if (client.Character != null)
+            {
+                CharacterID = client.ID;
+                SenderName = client.Character.Name;
+                SenderMesh = client.Character.Mesh + (client.Character.Avatar * 10000u);
+            }
+
             switch (this.Channel)
             {
                 case TalkChannel.Talk:
@@ -182,16 +189,19 @@ namespace Comet.Game.Packets
                             x.Socket.Connected &&
                             string.Equals(x.Character.Name, this.RecipientName));
 
-                    await client.SendAsync(this);
                     Console.WriteLine($"[{this.Channel}] {this.SenderName} speaks to {this.RecipientName}: {this.Message}");
-                    
+
                     if (recipient == null)
                     {
+                        await client.SendAsync(this);
                         await SendSystemMessageAsync(client,
                             $"Recipient '{this.RecipientName}' is not online.");
                         return;
                     }
 
+                    RecipientMesh = recipient.Character.Mesh + (recipient.Character.Avatar * 10000u);
+
+                    await client.SendAsync(this);
                     if (recipient.Socket.Connected)
                         await recipient.SendAsync(this);
                     break;
