@@ -201,7 +201,6 @@ namespace Comet.Game.Packets
 
                     RecipientMesh = recipient.Character.Mesh + (recipient.Character.Avatar * 10000u);
 
-                    await client.SendAsync(this);
                     if (recipient.Socket.Connected)
                         await recipient.SendAsync(this);
                     break;
