@@ -213,10 +213,27 @@ namespace Comet.Game.Packets
             {
                 Console.WriteLine($"[MsgPlayer] Manual spawn replay requested by {client.ID} ({client.Character.Name}).");
                 await MsgPlayer.BroadcastAsync(client);
+            } else if (this.Message.Equals("/heal", StringComparison.OrdinalIgnoreCase))
+            {
+                var previousHealth = client.Character.HealthPoints;
+                client.Character.HealthPoints = GetMaximumHealth(client.Character);
+                await client.SendAsync(new MsgUserAttrib(
+                    client.ID,
+                    ClientUpdateType.Hitpoints,
+                    client.Character.HealthPoints));
+                await SendSystemMessageAsync(client, "Your health has been restored.");
             } else if (this.Message.StartsWith("/tp", StringComparison.OrdinalIgnoreCase))
             {
                 await ProcessTeleportAsync(client);
             }
+        }
+
+        private static ushort GetMaximumHealth(Character character)
+        {
+            return (ushort)((character.Strength * 3) +
+                (character.Agility * 3) +
+                (character.Spirit * 3) +
+                (character.Vitality * 24));
         }
 
         private async Task ProcessTeleportAsync(Client client)
