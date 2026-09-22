@@ -1,6 +1,7 @@
 namespace Comet.Game.States
 {
     using System;
+    using System.Collections.Generic;
     using System.Net.Sockets;
     using Comet.Network.Security;
     using Comet.Network.Sockets;
@@ -17,6 +18,9 @@ namespace Comet.Game.States
         public Character Character = null;
         public Creation Creation = null;
         public DiffieHellman DiffieHellman = null;
+        public DateTime LastWalkAt = DateTime.MinValue;
+        public Queue<DateTime> WalkHistory = new Queue<DateTime>();
+        public byte LastWalkDirection;
 
         // Client unique identifier
         public uint ID => Character?.CharacterID ?? 0;

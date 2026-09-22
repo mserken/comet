@@ -33,6 +33,11 @@ namespace Comet.Game.Packets
 {
     public sealed class MsgWalk : MsgBase<Client>
     {
+        private const int MinimumWalkMilliseconds = 100;
+        private const int WalkWindowMilliseconds = 5000;
+        private const int MaximumWalksPerWindow = 26;
+        public const int ViewDistance = 18;
+
         public MsgWalk()
         {
             Type = PacketType.MsgWalk;
@@ -86,72 +91,153 @@ namespace Comet.Game.Packets
         /// <param name="client">Client requesting packet processing</param>
         public override async Task ProcessAsync(Client client)
         {
+            if (client.Character == null)
+                return;
+
             Identity = client.ID;
-            await Task.WhenAll(client.SendAsync(this));
             Console.WriteLine("MsgWalk: {0} Direction: {1} Identity: {2} Mode: {3} Padding: {4}", client.ID, Direction, Identity, Mode, Padding);
-            // update x and y coordinates of the character based on the direction of movement
+
+            var now = DateTime.UtcNow;
+            while (client.WalkHistory.Count > 0 &&
+                (now - client.WalkHistory.Peek()).TotalMilliseconds > WalkWindowMilliseconds)
+            {
+                client.WalkHistory.Dequeue();
+            }
+
+            client.WalkHistory.Enqueue(now);
+            var elapsed = (now - client.LastWalkAt).TotalMilliseconds;
+            var tooSoon = client.LastWalkAt != DateTime.MinValue &&
+                elapsed < MinimumWalkMilliseconds;
+            var tooMany = client.WalkHistory.Count > MaximumWalksPerWindow;
+
+            if (tooSoon || tooMany)
+            {
+                Console.WriteLine(
+                    "[MsgWalk] Rejected identity={0}, tooSoon={1}, tooMany={2}, elapsed={3}ms, windowCount={4}",
+                    client.ID, tooSoon, tooMany, elapsed, client.WalkHistory.Count);
+                await SendCorrectionAsync(client);
+                return;
+            }
+
+            client.LastWalkAt = now;
+            client.LastWalkDirection = Direction;
+            await client.SendAsync(this);
+
+            var previousX = client.Character.X;
+            var previousY = client.Character.Y;
+            var nextX = previousX;
+            var nextY = previousY;
+
             switch (Direction)
             {
                 case 0: // Down-Left
-                    client.Character.Y += 1;
+                    nextY += 1;
                     break;
                 case 1: // Left
-                    client.Character.X -= 1;
-                    client.Character.Y += 1;
+                    nextX -= 1;
+                    nextY += 1;
                     break;
                 case 2: // Up-Left
-                    client.Character.X -= 1;
+                    nextX -= 1;
                     break;
                 case 3: // Up
-                    client.Character.X -= 1;
-                    client.Character.Y -= 1;
+                    nextX -= 1;
+                    nextY -= 1;
                     break;
                 case 4: // Up-Right
-                    client.Character.Y -= 1;
+                    nextY -= 1;
                     break;
                 case 5: // Right
-                    client.Character.X += 1;
-                    client.Character.Y -= 1;
+                    nextX += 1;
+                    nextY -= 1;
                     break;
                 case 6: // Down-Right
-                    client.Character.X += 1;
+                    nextX += 1;
                     break;
                 case 7: // Down
-                    client.Character.X += 1;
-                    client.Character.Y += 1;
+                    nextX += 1;
+                    nextY += 1;
                     break;
                 default:
                     Console.WriteLine("Invalid direction: {0}", Direction);
                     break;
             }
+
+            if (nextX < 0 || nextX > ushort.MaxValue ||
+                nextY < 0 || nextY > ushort.MaxValue)
+            {
+                Console.WriteLine(
+                    "[MsgWalk] Rejected identity={0}: position ({1}, {2}) is outside coordinate bounds",
+                    client.ID, nextX, nextY);
+                await SendCorrectionAsync(client);
+                return;
+            }
+
+            client.Character.X = (ushort)nextX;
+            client.Character.Y = (ushort)nextY;
             Console.WriteLine("Character Position: X: {0} Y: {1}", client.Character.X, client.Character.Y);
 
-            var recipients = Kernel.Clients.Values
+            var players = Kernel.Clients.Values
                 .Where(x => x != client && x.Character != null && x.Socket.Connected &&
                     x.Character.MapID == client.Character.MapID)
                 .ToArray();
 
             Console.WriteLine(
-                "[MsgWalk] Broadcasting identity={0}, direction={1}, mode={2}, map={3}, position=({4}, {5}), recipients={6}",
-                Identity, Direction, Mode, client.Character.MapID,
-                client.Character.X, client.Character.Y, recipients.Length);
+                "[MsgWalk] Processing identity={0}, direction={1}, map={2}, old=({3}, {4}), new=({5}, {6}), candidates={7}",
+                Identity, Direction, client.Character.MapID, previousX, previousY,
+                client.Character.X, client.Character.Y, players.Length);
 
-            await Task.WhenAll(recipients.Select(async recipient =>
+            foreach (var player in players)
             {
-                try
+                var isInView = IsWithin(client.Character.X, client.Character.Y,
+                    player.Character.X, player.Character.Y, ViewDistance);
+
+                if (isInView)
                 {
-                    await recipient.SendAsync(this);
-                    Console.WriteLine(
-                        "[MsgWalk] Sent movement identity={0} to recipient={1}",
-                        Identity, recipient.ID);
+                    await player.SendAsync(new MsgPlayer(client.Character));
+                    await client.SendAsync(new MsgPlayer(player.Character));
+                    await player.SendAsync(new MsgAction
+                    {
+                        CharacterID = Identity,
+                        Action = MsgAction.ActionType.CharacterDirection,
+                        Direction = Direction
+                    });
+                    await player.SendAsync(this);
+                    Console.WriteLine("[MsgWalk] Refreshed and sent movement identity={0} to recipient={1}", Identity, player.ID);
                 }
-                catch (Exception exception)
+                else
                 {
-                    Console.WriteLine(
-                        "[MsgWalk] Send failed identity={0} to recipient={1}: {2}",
-                        Identity, recipient.ID, exception);
+                    await player.SendAsync(new MsgAction
+                    {
+                        CharacterID = Identity,
+                        Action = MsgAction.ActionType.MapRemoveSpawn
+                    });
+                    await client.SendAsync(new MsgAction
+                    {
+                        CharacterID = player.ID,
+                        Action = MsgAction.ActionType.MapRemoveSpawn
+                    });
+                    Console.WriteLine("[MsgWalk] Removed out-of-view identity={0} from recipient={1}", Identity, player.ID);
                 }
-            }));
+            }
+        }
+
+        private static bool IsWithin(ushort x, ushort y, ushort otherX, ushort otherY, int distance)
+        {
+            return Math.Abs(x - otherX) <= distance && Math.Abs(y - otherY) <= distance;
+        }
+
+        private static Task SendCorrectionAsync(Client client)
+        {
+            return client.SendAsync(new MsgAction
+            {
+                CharacterID = client.ID,
+                Action = MsgAction.ActionType.MapKickBack,
+                Command = (uint)((client.Character.Y << 16) | client.Character.X),
+                Direction = client.LastWalkDirection,
+                X = client.Character.X,
+                Y = client.Character.Y
+            });
         }
     }
 
