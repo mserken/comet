@@ -53,7 +53,7 @@ namespace Comet.Game.Packets
             var reader = new PacketReader(bytes);
             Length = reader.ReadUInt16();
             Type = (PacketType) reader.ReadUInt16();
-            Direction = (byte) reader.ReadUInt32();
+            Direction = (byte) (reader.ReadUInt32() % 8);
             Identity = reader.ReadUInt32();
             Mode = reader.ReadByte();
             Padding = reader.ReadUInt16();
@@ -88,33 +88,33 @@ namespace Comet.Game.Packets
             await Task.WhenAll(client.SendAsync(this));
             Console.WriteLine("MsgWalk: {0} Direction: {1} Identity: {2} Mode: {3} Padding: {4}", client.ID, Direction, Identity, Mode, Padding);
             // update x and y coordinates of the character based on the direction of movement
-            switch (Direction % 8)
+            switch (Direction)
             {
-                case 0: // Up
+                case 0: // Down-Left
                     client.Character.Y += 1;
                     break;
-                case 1: // Up-Right
+                case 1: // Left
                     client.Character.X -= 1;
                     client.Character.Y += 1;
                     break;
-                case 2: // Right
+                case 2: // Up-Left
                     client.Character.X -= 1;
                     break;
-                case 3: // Down-Right
+                case 3: // Up
                     client.Character.X -= 1;
                     client.Character.Y -= 1;
                     break;
-                case 4: // Down
+                case 4: // Up-Right
                     client.Character.Y -= 1;
                     break;
-                case 5: // Down-Left
+                case 5: // Right
                     client.Character.X += 1;
                     client.Character.Y -= 1;
                     break;
-                case 6: // Left
+                case 6: // Down-Right
                     client.Character.X += 1;
                     break;
-                case 7: // Up-Left
+                case 7: // Down
                     client.Character.X += 1;
                     client.Character.Y += 1;
                     break;
