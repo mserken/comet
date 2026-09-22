@@ -194,8 +194,6 @@ namespace Comet.Game.Packets
 
                 if (isInView)
                 {
-                    await player.SendAsync(new MsgPlayer(client.Character));
-                    await client.SendAsync(new MsgPlayer(player.Character));
                     await player.SendAsync(new MsgAction
                     {
                         CharacterID = Identity,
