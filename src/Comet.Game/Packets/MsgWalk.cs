@@ -22,6 +22,7 @@
 #region References
 
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Comet.Game.States;
 using Comet.Network.Packets;
@@ -85,6 +86,7 @@ namespace Comet.Game.Packets
         /// <param name="client">Client requesting packet processing</param>
         public override async Task ProcessAsync(Client client)
         {
+            Identity = client.ID;
             await Task.WhenAll(client.SendAsync(this));
             Console.WriteLine("MsgWalk: {0} Direction: {1} Identity: {2} Mode: {3} Padding: {4}", client.ID, Direction, Identity, Mode, Padding);
             // update x and y coordinates of the character based on the direction of movement
@@ -123,6 +125,33 @@ namespace Comet.Game.Packets
                     break;
             }
             Console.WriteLine("Character Position: X: {0} Y: {1}", client.Character.X, client.Character.Y);
+
+            var recipients = Kernel.Clients.Values
+                .Where(x => x != client && x.Character != null && x.Socket.Connected &&
+                    x.Character.MapID == client.Character.MapID)
+                .ToArray();
+
+            Console.WriteLine(
+                "[MsgWalk] Broadcasting identity={0}, direction={1}, mode={2}, map={3}, position=({4}, {5}), recipients={6}",
+                Identity, Direction, Mode, client.Character.MapID,
+                client.Character.X, client.Character.Y, recipients.Length);
+
+            await Task.WhenAll(recipients.Select(async recipient =>
+            {
+                try
+                {
+                    await recipient.SendAsync(this);
+                    Console.WriteLine(
+                        "[MsgWalk] Sent movement identity={0} to recipient={1}",
+                        Identity, recipient.ID);
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine(
+                        "[MsgWalk] Send failed identity={0} to recipient={1}: {2}",
+                        Identity, recipient.ID, exception);
+                }
+            }));
         }
     }
 
