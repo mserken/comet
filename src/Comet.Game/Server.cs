@@ -135,6 +135,7 @@ namespace Comet.Game
                     case PacketType.MsgAction:   msg = new MsgAction(); break;
                     case PacketType.MsgConnect:  msg = new MsgConnect(); break;
                     case PacketType.MsgTalk:     msg = new MsgTalk(); break;
+                    case PacketType.MsgName:     msg = new MsgName(); break;
                     case PacketType.MsgWalk:     msg = new MsgWalk(); break;
 
                     default:
