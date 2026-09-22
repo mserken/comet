@@ -173,7 +173,7 @@ namespace Comet.Game
                 Kernel.Registration.Remove(actor.Creation.Token);
 
             if (actor.Character != null)
-                actor.Character.SaveAsync(true).GetAwaiter();
+                actor.Character.SaveAsync(true).GetAwaiter().GetResult();
         }
     }
 }
