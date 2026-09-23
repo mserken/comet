@@ -168,6 +168,9 @@ namespace Comet.Game
         protected override void Disconnected(Client actor) 
         {
             if (actor == null) return;
+            actor.BattleGeneration++;
+            actor.BattleActive = false;
+            actor.BattleTargetIdentity = 0;
             this.Processor.DeselectPartition(actor.Partition);
             Kernel.Clients.TryRemove(actor.ID, out _);
 

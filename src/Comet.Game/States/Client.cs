@@ -3,6 +3,8 @@ namespace Comet.Game.States
     using System;
     using System.Collections.Generic;
     using System.Net.Sockets;
+    using System.Threading.Tasks;
+    using Comet.Game.Packets;
     using Comet.Network.Security;
     using Comet.Network.Sockets;
 
@@ -21,6 +23,11 @@ namespace Comet.Game.States
         public DateTime LastWalkAt = DateTime.MinValue;
         public Queue<DateTime> WalkHistory = new Queue<DateTime>();
         public byte LastWalkDirection;
+        public int BattleGeneration;
+        public bool BattleActive;
+        public uint BattleTargetIdentity;
+        public MsgInteractType BattleAction;
+        public DateTime LastBattleAt = DateTime.MinValue;
 
         // Client unique identifier
         public uint ID => Character?.CharacterID ?? 0;
