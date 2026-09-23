@@ -142,6 +142,20 @@ namespace Comet.Game.Packets
             }
         }
 
+        public static async Task BroadcastLevelUpAsync(Client client)
+        {
+            var levelUp = new MsgAction
+            {
+                CharacterID = client.ID,
+                Action = ActionType.CharacterLevelUp
+            };
+            var recipients = Kernel.Clients.Values
+                .Where(x => x.Character != null && x.Socket.Connected &&
+                    x.Character.MapID == client.Character.MapID)
+                .ToArray();
+            await Task.WhenAll(recipients.Select(x => x.SendAsync(levelUp)));
+        }
+
         /// <summary>
         /// Defines actions that may be requested by the user, or given to by the server.
         /// Allows for action handling as a packet subtype. Enums should be named by the 
